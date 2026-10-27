@@ -291,7 +291,7 @@ button.ord-strip-t:focus-visible { outline: 2px solid var(--ord-acc); outline-of
     <h2 class="ord-details-h">Details</h2>
     <div class="ord-strips" id="ord-acct-strips"></div>
     <div class="ord-wi-panel" id="ord-wi-acct" hidden></div>
-    <details class="ord-sec" id="scenarios-account" open><summary>Scenario P&amp;L · account</summary>
+    <details class="ord-sec" id="scenarios-account"><summary>Scenario P&amp;L · account</summary>
       <div class="ord-secbody"><div class="ord-dim" id="ord-scen-acct-note"></div>
         <div class="ord-scroll"><table class="ord-tbl ord-scen" id="ord-scen-acct-tbl" data-source="scenarios" data-row-key="id"></table></div></div></details>
     <div class="ord-scroll"><table class="ord-tbl" id="ord-sum-tbl" data-source="summary" data-row-key="underlying"></table></div>
@@ -330,8 +330,8 @@ button.ord-strip-t:focus-visible { outline: 2px solid var(--ord-acc); outline-of
       <label class="ord-pro">Method <select id="ord-shk-mode" aria-label="IV shock method">
         <option value="parallel">Parallel shift (vol points)</option>
         <option value="prop">Proportional (% of current vol)</option>
-        <option value="norm" selected>Normalized-strike remap (ATM vol points)</option>
-      </select></label>
+        <option value="norm" selected>ATM shift, skew preserved</option>
+      </select></label><span class="ord-i ord-pro" tabindex="0" role="button" data-tip="shock_method" aria-label="About the IV shock methods">i</span>
       <label class="ord-pro">Amount <span class="ord-step"><button type="button" class="ord-mv" id="ord-shk-dn" aria-label="Lower shock">−</button><input type="number" id="ord-shk-amt" step="0.5" value="0" aria-label="Shock amount"><button type="button" class="ord-mv" id="ord-shk-up" aria-label="Raise shock">+</button></span><span id="ord-shk-unit">ATM vol pts</span></label>
       <label class="ord-chk ord-pro"><input type="checkbox" id="ord-shk-sqrt" checked> Scale by √time (30-day = 1×)</label>
       <button type="button" class="ord-btn" id="ord-shk-reset">Reset</button>
@@ -340,7 +340,7 @@ button.ord-strip-t:focus-visible { outline: 2px solid var(--ord-acc); outline-of
     <div class="ord-scroll ord-tall" id="ord-chain-box"><table class="ord-tbl ord-chain" id="ord-chain-tbl" data-source="chain" data-row-key="id"></table></div>
     <p class="ord-dim ord-pro">Click a bid to sell or an ask to buy as a what-if trade; nothing is sent. Per-share greeks: gamma per $1, theta per calendar day, vega per vol point, rho per 1%. Darker shading marks in-the-money options; Pos badges show contracts held.</p>
     <p class="ord-dim ord-simple-only">Tip: click a bid to test selling that option or an ask to test buying it; nothing is sent. Delta is how much the option moves for a $1 move in the stock. Shaded rows are in the money; a badge in Pos means you hold that option.</p>
-    <details class="ord-sec" id="scenarios" open><summary>Scenario P&amp;L</summary>
+    <details class="ord-sec" id="scenarios"><summary>Scenario P&amp;L</summary>
       <div class="ord-secbody"><div class="ord-dim" id="ord-scen-note"></div>
         <div class="ord-scroll"><table class="ord-tbl ord-scen" id="ord-scen-tbl" data-source="scenarios" data-row-key="id"></table></div></div></details>
     <details class="ord-sec" id="positions"><summary id="ord-pos-sum">Positions</summary>
@@ -375,7 +375,7 @@ button.ord-strip-t:focus-visible { outline: 2px solid var(--ord-acc); outline-of
           <p><b>IV</b> is solved from each mid with the native model: Bjerksund-Stensland 2002 for American equity/ETF options, Black-Scholes-Merton for European index options. No bid, no IV.</p>
           <p><b>Theo</b> prices off the fitted surface, not the option’s own IV, so theo minus mid shows where the quote sits. CRR uses 100 steps.</p>
           <p><b>30-day IV</b> applies the Cboe VIX method to each chain (forward from the ATM call–put mid, strips cut after two zero bids, minute-weighted interpolation across 30 days). <b>One-day move</b> = spot × 30-day IV × √(1/252). With earnings inside 7 days, the move to the first post-earnings expiration and the implied event move from the two post-earnings expirations are added.</p>
-          <p><b>IV shock (chain only)</b> changes Theo and the chain greeks. Parallel and proportional methods move every vol by the same points or percentage. The normalized-strike method raises the ATM vol and keeps the skew fixed as a vol-point spread over ATM in normalized strikes z = ln(K/F)/(σ<sub>ATM</sub>√T); each strike takes the skew at its new z, so a downward skew flattens as vol rises. √time scaling multiplies the shock by √(30/days to expiry).</p>
+          <p><b>IV shock (chain only)</b> changes Theo and the chain greeks. Parallel and proportional methods move every vol by the same points or percentage. The ATM shift, skew preserved method raises the ATM vol and keeps the skew fixed as a vol-point spread over ATM in normalized strikes z = ln(K/F)/(σ<sub>ATM</sub>√T); each strike takes the skew at its new z, so a downward skew flattens as vol rises. √time scaling multiplies the shock by √(30/days to expiry).</p>
           <p><b>P&amp;L</b> is unrealized against cost basis at mid marks; there is no prior-close price in the sample data, so no day P&amp;L yet.</p>
           <p><b>Requirements</b> are Reg T initial and FINRA 4210 maintenance minimums. Pairing sequence: conversions/reversals, collars, covered, protective, boxes, iron condors, butterflies, verticals, calendars/diagonals, short combos, naked; the largest naked requirement is paired first within each step.</p>
         </div>
@@ -1394,7 +1394,7 @@ dash.calc('summary', { inputs: ['positions_view', 'pairing', 'options', 'underly
   description: 'Security-level greeks, VIX-method 30-day IV, one-day and earnings expected moves, and total requirements per underlying plus the account.',
   fn: (positions_view, pairing, options, underlyings) => {
   const out = [];
-  const tot = { underlying: 'Account total', dollar_delta: 0, dollar_gamma: 0, theta: 0, vega: 0, rho: 0, initial_req: 0, maint_req: 0, market_value: 0, stock_value: 0, option_value: 0, cost_value: 0, unrealized_pl: 0 };
+  const tot = { underlying: 'Account total', dollar_delta: 0, dollar_gamma: 0, theta: 0, vega: 0, rho: 0, initial_req: 0, maint_req: 0, market_value: 0, stock_value: 0, option_value: 0, cost_value: 0, unrealized_pl: 0, expected_pl: 0, expected_gamma_pl: 0, nextday_up: 0, nextday_down: 0 };
   for (const u of underlyings) {
     const sym = u.symbol, S = Number(u.spot), asof = Date.parse(u.asof_utc);
     const pv = positions_view.filter((p) => p.underlying === sym), pr = pairing.filter((p) => p.underlying === sym);
@@ -1463,7 +1463,18 @@ dash.calc('summary', { inputs: ['positions_view', 'pairing', 'options', 'underly
       initial_req: sum(pr, 'initial_req'), maint_req: sum(pr, 'maint_req'), market_value: sum(pv, 'market_value'),
       stock_value: sum(pv.filter((p) => p.kind === 'stock'), 'market_value'), option_value: sum(pv.filter((p) => p.kind === 'option'), 'market_value'),
       unrealized_pl: sum(pv, 'unrealized_pl'), cost_value: sum(pv, 'market_value') - sum(pv, 'unrealized_pl'), positions: pv.length };
-    for (const f of ['dollar_delta', 'dollar_gamma', 'theta', 'vega', 'rho', 'initial_req', 'maint_req', 'market_value', 'stock_value', 'option_value', 'cost_value', 'unrealized_pl']) tot[f] += row[f];
+    // Expected one-day P&L, second-order Taylor expansion with E[dS] = 0 and E[dS^2] = (S * IV30)^2 / 252:
+    //   E[P&L] = theta (1 calendar day) + 1/2 * gamma (shares per $1) * (S * IV30 / sqrt(252))^2
+    row.expected_gamma_pl = iv30 != null ? 0.5 * row.gamma * (S * iv30) ** 2 / 252 : 0;
+    row.expected_pl = row.theta + row.expected_gamma_pl;
+    // Next-day P&L, second-order Taylor estimate over one day for a 1-SD move m = S * IV30 / sqrt(252):
+    //   up = +delta*m + 1/2*gamma*m^2 + theta,  down = -delta*m + 1/2*gamma*m^2 + theta  (theta = one calendar day)
+    // Their average is the expected P&L, theta + 1/2*gamma*m^2.
+    if (em1d != null) {
+      const dPart = row.net_delta * em1d, gPart = 0.5 * row.gamma * em1d * em1d;
+      row.nextday_up = dPart + gPart + row.theta; row.nextday_down = -dPart + gPart + row.theta;
+    } else { row.nextday_up = null; row.nextday_down = null; }
+    for (const f of ['dollar_delta', 'dollar_gamma', 'theta', 'vega', 'rho', 'initial_req', 'maint_req', 'market_value', 'stock_value', 'option_value', 'cost_value', 'unrealized_pl', 'expected_pl', 'expected_gamma_pl', 'nextday_up', 'nextday_down']) tot[f] += row[f];
     out.push(row);
   }
   out.push(tot);
@@ -1482,6 +1493,7 @@ dash.calc('summary', { inputs: ['positions_view', 'pairing', 'options', 'underly
     usd0: d3.format('$,.0f'),
     usdx: d3.format('$,.0f'), usd2: d3.format('$,.2f'), num0: d3.format(',.0f'), num1: d3.format(',.1f'), num2: d3.format(',.2f'),
     num3: d3.format(',.3f'), num4: d3.format(',.4f'), pct1: d3.format('.1%'), pct2: d3.format('.2%'), px2: d3.format(',.2f'),
+    pmusd0: (v) => '±' + d3.format('$,.0f')(Math.abs(v)),
     pm2: (v) => '±' + d3.format('$,.2f')(Math.abs(v)), pmpct: (v) => '±' + d3.format('.2%')(Math.abs(v)),
   };
   const fmt = (v, f) => (f === 'date' ? (v ? dlabel(String(v)) : '—') : f === 'text' ? (v == null ? '—' : String(v)) : ok(v) ? FMT[f](Number(v)) : '—');
@@ -1498,7 +1510,7 @@ dash.calc('summary', { inputs: ['positions_view', 'pairing', 'options', 'underly
       ['dollar_gamma', '$ Gamma (1%)', 'usd0', true, true], ['theta', 'Theta $/day', 'usd0', true, true], ['vega', 'Vega $/pt', 'usd0', true, true], ['rho', 'Rho $/1%', 'usd0', false, true]] },
     pnl: { title: 'Line 2 · Mark-to-market and P&L', strip: 'MTM / P&L', cols: [
       ['market_value', 'Net mkt value', 'usd0', true, true], ['stock_value', 'Stock', 'usd0', true, true], ['option_value', 'Options', 'usd0', true, true],
-      ['cost_value', 'Cost', 'usd0', false, true], ['unrealized_pl', 'Unrealized P&L', 'usd0', true, true]] },
+      ['cost_value', 'Cost', 'usd0', false, true], ['unrealized_pl', 'Unrealized P&L', 'usd0', true, true], ['nextday', 'Next-day P&L (±1 SD)', 'usd0', true, true]] },
     risk: { title: 'Line 3 · Volatility and requirements', strip: 'Vol / Req', cols: [
       ['iv30', '30d IV', 'pct2'], ['expected_move_1d', '1-day move', 'pm2'], ['expected_move_1d_pct', '1-day move %', 'pmpct'],
       ['move_to_earnings_expiry', 'Move to earnings exp', 'pm2'], ['implied_earnings_move', 'Earnings event move', 'pm2'],
@@ -1564,17 +1576,29 @@ dash.calc('summary', { inputs: ['positions_view', 'pairing', 'options', 'underly
       'it shows which strikes and expirations carry the most volatility exposure; longer-dated, at-the-money options carry the most.'),
     chain_rho: P('Rho (per share)', 'How much the option’s price changes if interest rates rise 1 percentage point. Multiply by 100 for one contract.',
       'usually small, but it adds up in long-dated and deep in-the-money options.'),
-    chain_ivshock: P('IV Shock', 'The volatility used for the Theo column after the IV shock: the fitted-surface vol, moved by the shock settings above the chain. With the normalized-strike method only the ATM vol moves by the stated amount; each strike then takes the skew of its new position in standard-deviation terms, so the change varies by strike. With no shock it equals the surface vol.',
+    chain_ivshock: P('IV Shock', 'The volatility used for the Theo column after the IV shock: the fitted-surface vol, moved by the shock settings above the chain. With the ATM shift, skew preserved method only the ATM vol moves by the stated amount; each strike then takes the skew of its new position in standard-deviation terms, so the change varies by strike. With no shock it equals the surface vol.',
       'it shows exactly which vol each theoretical value was priced at, so you can see how a parallel or proportional move, with or without square-root-of-time scaling, lands on each expiration.'),
     chain_theo: P('Theoretical value', 'What the selected model says the option is worth, priced off the fitted volatility surface rather than this option’s own quote.',
       'comparing it with the bid and ask shows whether the market price sits rich or cheap against the model.'),
   });
+  TIPS.expected_pl_unused = P('Expected P&L (1 day)', ['What the options book is expected to make or lose over one day if the stock makes a typical move and nothing else changes. It is a second-order Taylor approximation: Expected P&L = Theta + ½ × Gamma × (S × IV30 ÷ √252)².',
+      'Theta is one calendar day of time decay. The gamma term is the average gain (long gamma) or loss (short gamma) from a typical one-day move, sized with the 30-day implied vol. Delta, vega and rho drop out because the expected price, vol and rate changes are taken as zero.'],
+      'it shows whether time decay is expected to pay for the gamma risk you carry. For options priced at the same vol used here, theta and the gamma term roughly offset; a result well above zero means decay outweighs the expected cost of normal moves, well below zero the reverse. Big gaps such as earnings can be far larger than one standard deviation, so treat it as a typical-day figure, not a worst case.');
+  TIPS.nextday = P('Next-day P&L (±1 SD)', ['Estimated P&L over the next day if the stock makes a typical one-standard-deviation move up (first figure) or down (second). It is a second-order Taylor estimate: ±Delta × m + ½ × Gamma × m² + Theta, where m is the one-day expected move (spot × 30-day IV × √(1/252)) and Theta is one calendar day of decay.',
+      'The two figures differ because of gamma: short gamma makes the down day worse than the up day is good, long gamma the reverse. Their average is the expected P&L, Theta + ½ × Gamma × m². Over a weekend about three days of theta arrive against one trading day’s move. On the Account line every underlying is assumed to move its own one-day amount in the same direction at once.'],
+      'it answers “what happens to me on a normal day?” in both directions, including the decay you collect or pay, and shows at a glance whether the position is lopsided.');
+  TIPS.shock_method = P('IV shock methods', [
+      'Parallel shift (vol points): every option’s vol moves by the same number of points. +2 takes 30% to 32% and 50% to 52%.',
+      'Proportional (% of current vol): every vol moves by the same percentage of itself. +10% takes 30% to 33% and 50% to 55%, so higher vols move more.',
+      'ATM shift, skew preserved: the at-the-money vol moves by your amount, and every other strike keeps the same skew relative to ATM, measured in standard deviations from the forward. As vol rises each strike sits fewer standard deviations out, so a downward skew flattens: downside puts rise less than ATM and upside calls more. Falling vol does the reverse.',
+      'With “Scale by √time” on, the amount applies at 30 days and is multiplied by √(30 ÷ days to expiry), so short-dated options move more.'],
+      'the method decides how a vol move is shared across strikes and expirations. ATM shift, skew preserved is the default because it best matches how equity and index skews tend to behave when volatility changes.');
   TIPS.delta = TIPS.net_delta; TIPS.expected_move_1d_pct = TIPS.expected_move_1d; TIPS.chain_iv = TIPS.iv;
   const tipKey = (view, k) => (view === 'chain' ? (TIPS['chain_' + k] ? 'chain_' + k : null) : TIPS[k] ? k : null);
   const tipIcon = (k) => { const i = ce('span', 'ord-i', 'i'); i.tabIndex = 0; i.dataset.tip = k; i.setAttribute('role', 'button'); i.setAttribute('aria-label', 'About ' + TIPS[k].h.toLowerCase()); return i; };
   const META = {}; for (const v in VIEWS) { META[v] = {}; for (const c of VIEWS[v].cols) META[v][c[0]] = { label: c[1], f: c[2], signed: !!c[4], text: c[2] === 'text' }; }
   // Alex's saved layout: the default on open and what Restore defaults returns to
-  const DEFAULT_LAYOUT = '{"chain":["bid","ask","iv","theo","ivshock","delta","gamma","theta","vega","-rho","pos"],"greeks":["net_delta","gamma","theta","vega","dollar_delta","dollar_gamma","-rho"],"pnl":["market_value","-stock_value","-option_value","-cost_value","unrealized_pl"],"risk":["iv30","expected_move_1d","expected_move_1d_pct","move_to_earnings_expiry","implied_earnings_move","-initial_req","maint_req"],"positions":["-symbol","description","quantity","mark","cost_basis","market_value","unrealized_pl","iv","delta","-dollar_delta","gamma","-dollar_gamma","theta","vega","-rho"],"pairing":["strategy","legs","-quantity","initial_req","maint_req","net_premium","-basis"],"account":["underlying","spot","net_delta","dollar_delta","-gamma","dollar_gamma","theta","vega","-rho","market_value","unrealized_pl","iv30","expected_move_1d_pct","initial_req","maint_req"]}';
+  const DEFAULT_LAYOUT = '{"chain":["bid","ask","iv","theo","ivshock","delta","gamma","theta","vega","-rho","pos"],"greeks":["net_delta","gamma","theta","vega","dollar_delta","dollar_gamma","-rho"],"pnl":["market_value","-stock_value","-option_value","-cost_value","unrealized_pl","nextday"],"risk":["iv30","expected_move_1d","expected_move_1d_pct","move_to_earnings_expiry","implied_earnings_move","-initial_req","maint_req"],"positions":["-symbol","description","quantity","mark","cost_basis","market_value","unrealized_pl","iv","delta","-dollar_delta","gamma","-dollar_gamma","theta","vega","-rho"],"pairing":["strategy","legs","-quantity","initial_req","maint_req","net_premium","-basis"],"account":["underlying","spot","net_delta","dollar_delta","-gamma","dollar_gamma","theta","vega","-rho","market_value","unrealized_pl","iv30","expected_move_1d_pct","initial_req","maint_req"]}';
   function layout(src) {
     let saved = {}; try { saved = JSON.parse((src === undefined ? (dash.params().layout || DEFAULT_LAYOUT) : src) || '{}') || {}; } catch (e) { saved = {}; }
     const L = {};
@@ -1594,7 +1618,7 @@ dash.calc('summary', { inputs: ['positions_view', 'pairing', 'options', 'underly
   let active = 'account', model = 'theo', lastChainKey = '', nStrikes = '7', view = 'pro';
   // Simple view: a fixed short list of columns per area; Pro uses the Settings layout
   const SIMPLE = {
-    chain: ['bid', 'ask', 'iv', 'delta', 'pos'], greeks: ['net_delta', 'theta', 'vega'], pnl: ['market_value', 'unrealized_pl'],
+    chain: ['bid', 'ask', 'iv', 'delta', 'pos'], greeks: ['net_delta', 'theta', 'vega'], pnl: ['market_value', 'unrealized_pl', 'nextday'],
     risk: ['expected_move_1d', 'implied_earnings_move', 'initial_req', 'maint_req'],
     positions: ['description', 'quantity', 'mark', 'market_value', 'unrealized_pl', 'delta'],
     account: ['underlying', 'spot', 'market_value', 'unrealized_pl', 'dollar_delta', 'theta', 'expected_move_1d_pct', 'initial_req', 'maint_req'],
@@ -1605,32 +1629,40 @@ dash.calc('summary', { inputs: ['positions_view', 'pairing', 'options', 'underly
     return out;
   };
   const expBy = {};
-  const PL = new Set(['unrealized_pl']);
+  const PL = new Set(['unrealized_pl', 'expected_pl']);
   const tone = (el, v, m) => { const k = el.dataset.field, on = PL.has(k) && ok(v); el.classList.toggle('ord-neg', on && Number(v) < 0); el.classList.toggle('ord-pos', on && Number(v) > 0); };
 
-  const stripOpen = { risk: true };
   function strips(box, L, row, where) {
     box.replaceChildren();
     for (const v of ['greeks', 'pnl', 'risk']) {
-      const keys = shown(L, v).filter((k) => !row || row[k] != null); // hide fields that don't apply (e.g. share delta on the account line)
+      const keys = shown(L, v).filter((k) => !row || (k === 'nextday' ? row.nextday_up != null : row[k] != null)); // hide fields that don't apply (e.g. share delta on the account line)
       if (!keys.length) continue;
       const line = ce('div', 'ord-strip'), items = ce('div', 'ord-items'); line.dataset.line = v;
-      if (v !== 'risk') line.append(ce('span', 'ord-strip-t', VIEWS[v].strip), items);
-      else { // the Vol/Req line collapses
-        const open = stripOpen[v] !== false, btn = ce('button', 'ord-strip-t');
-        btn.type = 'button'; btn.setAttribute('aria-expanded', String(open));
-        btn.append(ce('span', 'ord-chev', '▾'), document.createTextNode(VIEWS[v].strip));
-        if (!open) btn.append(ce('span', 'ord-hid', ` · ${keys.length} hidden`));
-        btn.addEventListener('click', () => { stripOpen[v] = !open; render(); });
-        if (!open) line.classList.add('ord-closed');
-        line.append(btn, items);
+      // the third line is titled by what it is actually showing
+      let title = VIEWS[v].strip;
+      if (v === 'risk') {
+        const VOLK = ['iv30', 'expected_move_1d', 'expected_move_1d_pct', 'move_to_earnings_expiry', 'implied_earnings_move'];
+        const hasVol = keys.some((k) => VOLK.includes(k)), hasReq = keys.some((k) => !VOLK.includes(k));
+        title = hasVol && hasReq ? 'Vol / Margin' : hasVol ? 'Volatility' : 'Margin';
       }
+      line.append(ce('span', 'ord-strip-t', title), items);
       for (const k of keys) {
         const m = META[v][k], it = ce('div', 'ord-it');
         let label = m.label; if (k === 'move_to_earnings_expiry' && row && row.earnings_expiry) label = 'Move to ' + dlabel(row.earnings_expiry) + ' exp';
-        const val = ce('span', 'ord-it-v' + (row ? '' : ' dash-skeleton'), row ? fmt(row[k], m.f) : '—');
-        val.dataset.source = 'summary'; val.dataset.where = where; val.dataset.field = k;
-        if (row) { tone(val, row[k], m); money(val, row[k], m.f); }
+        let val;
+        if (k === 'nextday') { // up / down pair
+          val = ce('span', 'ord-it-v' + (row ? '' : ' dash-skeleton'));
+          if (!row) val.textContent = '—';
+          else {
+            const part = (f) => { const v0 = Number(row[f]), e = ce('span', v0 > 0 ? 'ord-pos' : v0 < 0 ? 'ord-neg' : '', sgn(v0, 'usd0'));
+              e.dataset.source = 'summary'; e.dataset.where = where; e.dataset.field = f; return e; };
+            val.append(part('nextday_up'), document.createTextNode(' / '), part('nextday_down'));
+          }
+        } else {
+          val = ce('span', 'ord-it-v' + (row ? '' : ' dash-skeleton'), row ? fmt(row[k], m.f) : '—');
+          val.dataset.source = 'summary'; val.dataset.where = where; val.dataset.field = k;
+          if (row) { tone(val, row[k], m); money(val, row[k], m.f); }
+        }
         const kEl = ce('span', 'ord-it-k', label); if (tipKey(v, k)) kEl.append(tipIcon(tipKey(v, k)));
         it.append(kEl, val); items.append(it);
       }
@@ -1808,7 +1840,7 @@ dash.calc('summary', { inputs: ['positions_view', 'pairing', 'options', 'underly
     bar.append(bnote);
     note.replaceChildren(bar, document.createTextNode((useWI ? 'Including what-if trades. ' : '') + (view === 'simple'
       ? 'Profit or loss today if prices moved by each amount, with volatility unchanged. Worst case: '
-      : 'Instantaneous P&L with every option fully repriced; no time decay. Vol rows are ATM shocks at 30 days, scaled by √(30/days) per expiration and spread across strikes with the normalized-strike remap, as in the chain; vols stay sticky-strike under the price move. Worst cell: ')), money(ce('b', '', sgn(worst[0], 'usd0')), worst[0], 'usd0'),
+      : 'Instantaneous P&L with every option fully repriced; no time decay. Vol rows are ATM shocks at 30 days, scaled by √(30/days) per expiration and spread across strikes with the ATM shift, skew preserved method, as in the chain; vols stay sticky-strike under the price move. Worst cell: ')), money(ce('b', '', sgn(worst[0], 'usd0')), worst[0], 'usd0'),
       document.createTextNode(` at ${scenMode === 'beta' ? 'SPX ' : ''}${worst[1] > 0 ? '+' : worst[1] < 0 ? '−' : ''}${Math.abs(worst[1])}%${view === 'simple' ? '' : ' and ' + (worst[2] === 0 ? 'unchanged IV' : 'ATM ' + (worst[2] > 0 ? '+' : '−') + Math.abs(worst[2]) + ' vol pts')}.`));
     if (orders.length) {
       const lab = ce('label', 'ord-chk'), cb = ce('input'); cb.type = 'checkbox'; cb.checked = scenWI;
@@ -1854,7 +1886,7 @@ dash.calc('summary', { inputs: ['positions_view', 'pairing', 'options', 'underly
     s1.append(txt(pl >= 0 ? 'Up ' : 'Down '), plv, txt(' on open positions versus cost.')); c1.append(s1);
     // 2. market move (beta-weighted, vol unchanged)
     const sc = rows('scenarios').find((r) => r.underlying === 'Account total' && r.move_basis === 'beta' && r.vol_shift === 0);
-    const c2 = card('If the S&P 500 falls 10%', () => document.getElementById('scenarios-account').scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    const c2 = card('If the S&P 500 falls 10%', () => { const d = document.getElementById('scenarios-account'); d.open = true; d.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
     if (sc) {
       const dn = Number(sc.m_n10), up = Number(sc.m_p10);
       c2.append(mark(ce('span', 'ord-hc-v ' + (dn >= 0 ? 'ord-pos' : 'ord-neg'), sgn(dn, 'usd0')), 'scenarios', 'id=' + sc.id, 'm_n10', dn, 'usd0'));
@@ -2071,7 +2103,7 @@ dash.calc('summary', { inputs: ['positions_view', 'pairing', 'options', 'underly
     $('#ord-shk-unit').textContent = shock.mode === 'parallel' ? 'vol pts' : shock.mode === 'norm' ? 'ATM vol pts' : '% of vol';
     const on = shockOn(), pon = Math.abs(pxShock) > 1e-9; $('#iv-shock').classList.toggle('ord-on', on || pon);
     const a = (shock.amt > 0 ? '+' : '') + shock.amt;
-    const what = shock.mode === 'parallel' ? a + ' vol pts' : shock.mode === 'norm' ? `ATM ${a} vol pts, skew remapped in normalized strikes${shockInfo.atm0 ? ` (this expiry ATM ${fmt(shockInfo.atm0, 'pct2')} → ${fmt(shockInfo.atm1, 'pct2')})` : ''}` : a + '% of each vol';
+    const what = shock.mode === 'parallel' ? a + ' vol pts' : shock.mode === 'norm' ? `ATM ${a} vol pts, skew preserved${shockInfo.atm0 ? ` (this expiry ATM ${fmt(shockInfo.atm0, 'pct2')} → ${fmt(shockInfo.atm1, 'pct2')})` : ''}` : a + '% of each vol';
     const pxTxt = pon ? `Price ${pxShock > 0 ? '+' : '−'}${d3.format('.2~f')(Math.abs(pxShock) * 100)}%${curSpot ? ` (${fmt(curSpot, 'usd2')} → ${fmt(curSpot * (1 + pxShock), 'usd2')})` : ''}, vols sticky by strike` : '';
     const ivTxt = on ? `IV: ${what}${shock.sqrt ? ', scaled by √(30 / days to expiry)' : ''}` : '';
     if (view === 'simple') { $('#ord-shk-state').textContent = pon ? `Delta shown at ${curSpot ? fmt(curSpot * (1 + pxShock), 'usd2') : 'the new price'}; bid, ask and IV stay as quoted.` : 'Enter a % move (or a price) to see how each option’s delta would change.'; return; }
