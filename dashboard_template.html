@@ -154,6 +154,9 @@ button.ord-strip-t:focus-visible { outline: 2px solid var(--ord-acc); outline-of
 .ord-bar select, .ord-btn { font: inherit; font-size: var(--cds-font-size-caption); color: var(--color-fg); background: var(--color-bg); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: 4px 10px; cursor: pointer; transition: border-color var(--cds-dur-slow), background var(--cds-dur-slow); }
 .ord-bar select:hover, .ord-btn:hover:not(:disabled) { border-color: var(--color-fg-muted); }
 .ord-shockbar { padding: 6px var(--cds-pad-sm); background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); }
+.ord-shk-note { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); padding: 2px 2px 4px; }
+.ord-shk-note b { color: var(--ord-acc); font-weight: var(--cds-font-weight-medium); }
+.ord-it-v.ord-shkv { color: var(--ord-acc); }
 .ord-shockbar.ord-on { border-color: var(--ord-acc); background: color-mix(in srgb, var(--ord-acc) 7%, var(--color-panel)); }
 .ord-shock-t { font-weight: var(--cds-font-weight-medium); }
 .ord-shockbar .ord-sub-t { min-width: 0; color: var(--color-fg-muted); }
@@ -302,6 +305,7 @@ button.ord-strip-t:focus-visible { outline: 2px solid var(--ord-acc); outline-of
     <div class="ord-head">
       <span class="ord-sym" id="ord-sym">—</span>
       <span class="ord-spot" id="ord-spot" data-source="summary" data-field="spot">—</span>
+      <span class="ord-spot ord-shkv" id="ord-spot-shk"></span>
       <span class="ord-dim" id="ord-und-sub">—</span>
     </div>
     <div class="ord-strips" id="ord-und-strips"></div>
@@ -1634,6 +1638,8 @@ dash.calc('summary', { inputs: ['positions_view', 'pairing', 'options', 'underly
 
   function strips(box, L, row, where) {
     box.replaceChildren();
+    const SH = !!(row && row.__shocked);
+    if (SH) { const n = ce('div', 'ord-shk-note'); n.append(ce('b', '', 'Shocked values*'), document.createTextNode(' · ' + row.__label + ' · Reset in the Price & IV shock panel to return to today’s figures.')); box.append(n); }
     for (const v of ['greeks', 'pnl', 'risk']) {
       const keys = shown(L, v).filter((k) => !row || (k === 'nextday' ? row.nextday_up != null : row[k] != null)); // hide fields that don't apply (e.g. share delta on the account line)
       if (!keys.length) continue;
@@ -1655,15 +1661,16 @@ dash.calc('summary', { inputs: ['positions_view', 'pairing', 'options', 'underly
           if (!row) val.textContent = '—';
           else {
             const part = (f) => { const v0 = Number(row[f]), e = ce('span', v0 > 0 ? 'ord-pos' : v0 < 0 ? 'ord-neg' : '', sgn(v0, 'usd0'));
-              e.dataset.source = 'summary'; e.dataset.where = where; e.dataset.field = f; return e; };
+              if (!SH) { e.dataset.source = 'summary'; e.dataset.where = where; e.dataset.field = f; } return e; };
             val.append(part('nextday_up'), document.createTextNode(' / '), part('nextday_down'));
           }
         } else {
-          val = ce('span', 'ord-it-v' + (row ? '' : ' dash-skeleton'), row ? fmt(row[k], m.f) : '—');
-          val.dataset.source = 'summary'; val.dataset.where = where; val.dataset.field = k;
+          val = ce('span', 'ord-it-v' + (row ? '' : ' dash-skeleton') + (SH && !PL.has(k) ? ' ord-shkv' : ''), row ? fmt(row[k], m.f) : '—');
+          if (!SH) { val.dataset.source = 'summary'; val.dataset.where = where; } val.dataset.field = k;
           if (row) { tone(val, row[k], m); money(val, row[k], m.f); }
+          if (SH) delete val.dataset.field;
         }
-        const kEl = ce('span', 'ord-it-k', label); if (tipKey(v, k)) kEl.append(tipIcon(tipKey(v, k)));
+        const kEl = ce('span', 'ord-it-k', label + (SH && row.__shockedKeys.has(k) ? '*' : '')); if (tipKey(v, k)) kEl.append(tipIcon(tipKey(v, k)));
         it.append(kEl, val); items.append(it);
       }
       box.append(line);
@@ -1925,8 +1932,9 @@ dash.calc('summary', { inputs: ['positions_view', 'pairing', 'options', 'underly
     const s = rows('summary').find((r) => r.underlying === sym);
     $('#ord-sym').textContent = u.symbol;
     const spot = $('#ord-spot'); spot.dataset.where = 'underlying=' + sym; spot.textContent = s ? fmt(s.spot, 'px2') : '—';
+    $('#ord-spot-shk').textContent = s && anyOn() && Math.abs(pxShock) > 1e-9 ? '→ ' + fmt(Number(s.spot) * (1 + pxShock), 'px2') + '*' : '';
     $('#ord-und-sub').textContent = `${u.name} · ${u.product} · ${u.style === 'american' ? 'American, physical' : 'European, cash'} · ×${u.multiplier} · div ${d3.format('.2%')(u.div_yield)}` + (u.earnings_date ? ` · earnings ${dlabel(u.earnings_date)} ${u.earnings_timing}` : '');
-    strips($('#ord-und-strips'), L, s, 'underlying=' + sym);
+    strips($('#ord-und-strips'), L, s && anyOn() ? shockedSummary(sym, s) : s, 'underlying=' + sym);
     renderWhatIf($('#ord-wi-und'), sym);
     renderChain(sym, u, L);
     renderScenario($('#ord-scen-tbl'), $('#ord-scen-note'), sym);
@@ -2094,6 +2102,77 @@ dash.calc('summary', { inputs: ['positions_view', 'pairing', 'options', 'underly
   const shockOn = () => view !== 'simple' && Math.abs(shock.amt) > 1e-9;
   let pxShock = 0, curSpot = 0; // stock price shock as a fraction of spot
   const anyOn = () => shockOn() || Math.abs(pxShock) > 1e-9;
+  // ---- shocked summary lines: every position repriced at the shocked price and vols ----
+  const remapCache = {};
+  function remapFor(sym, exp) { // vol-point change by strike for the "ATM shift, skew preserved" method at one expiration
+    const key = sym + '|' + exp + '|' + shock.amt + '|' + shock.sqrt;
+    if (remapCache.key === key) return remapCache.fn;
+    const rowsE = rows('options').filter((o) => o.underlying === sym && o.expiry === exp && o.type === 'C' && Number(o.model_vol) > 0);
+    let fn = null;
+    if (rowsE.length > 1) {
+      const pts = rowsE.map((o) => [Math.log(Number(o.strike)), Number(o.model_vol)]).sort((a, b) => a[0] - b[0]);
+      const interp = (x) => { if (x <= pts[0][0]) return pts[0][1]; for (let i = 1; i < pts.length; i++) if (x <= pts[i][0]) { const [a, va] = pts[i - 1], [b, vb] = pts[i]; return va + (vb - va) * (x - a) / (b - a); } return pts[pts.length - 1][1]; };
+      const lnF = Math.log(Number(rowsE[0].forward)), f = shock.sqrt ? Math.sqrt(30 / Math.max(Number(rowsE[0].dte) || 0, 1)) : 1;
+      const s0 = interp(lnF), s1 = Math.max(s0 + (shock.amt / 100) * f, 0.03);
+      fn = (K) => { const lnK = Math.log(K); return (s1 - s0) + interp(lnF + (s0 / s1) * (lnK - lnF)) - interp(lnK); };
+    }
+    remapCache.key = key; remapCache.fn = fn; return fn;
+  }
+  const remapStore = {};
+  function shockOptVol(o, v) {
+    if (!shockOn()) return v;
+    if (shock.mode !== 'norm') return shockVol(v, o.dte);
+    const k = o.underlying + '|' + o.expiry;
+    if (!(k in remapStore) || remapStore[k].tag !== shock.amt + '|' + shock.sqrt) remapStore[k] = { tag: shock.amt + '|' + shock.sqrt, fn: remapFor(o.underlying, o.expiry) };
+    const fn = remapStore[k].fn; return fn ? Math.max(v + fn(Number(o.strike)), 0.03) : v;
+  }
+  function shockedSummary(sym, s) {
+    const u = rows('underlyings').find((x) => x.symbol === sym); if (!u) return s;
+    const S0 = Number(u.spot), S1 = S0 * (1 + pxShock), q = Number(u.div_yield) || 0, m = Number(u.multiplier) || 100, amer = u.style === 'american';
+    const O = optIndex(), net = new Map();
+    for (const p of rows('positions')) { const k = norm(p.symbol); const e = net.get(k) || { sym: String(p.symbol), q: 0 }; e.q += Number(p.quantity); net.set(k, e); }
+    const r = { ...s, __shocked: true, net_delta: 0, gamma: 0, theta: 0, vega: 0, rho: 0, market_value: Number(s.market_value) };
+    const shockedOpts = {};
+    for (const [k, e] of net) {
+      if (!e.q) continue;
+      const o = O[k];
+      if (o && o.underlying === sym) {
+        const T = Number(o.t_years), rr = Number(o.rate), b = rr - q, K = Number(o.strike);
+        const v0 = Number(o.iv) > 0 ? Number(o.iv) : Number(o.model_vol), v1 = shockOptVol(o, v0), n = e.q * m;
+        const p0 = window.ORD.price('theo', o.type, S0, K, T, rr, b, v0, amer), p1 = window.ORD.price('theo', o.type, S1, K, T, rr, b, v1, amer);
+        const g = window.ORD.greeks(o.type, S1, K, T, rr, b, v1, amer);
+        r.net_delta += n * (g.delta || 0); r.gamma += n * (g.gamma || 0); r.theta += n * (g.theta || 0); r.vega += n * (g.vega || 0); r.rho += n * (g.rho || 0);
+        r.market_value += n * (p1 - p0);
+        shockedOpts[norm(o.occ)] = Number(o.mid) + (p1 - p0);
+      } else if (!o && k === norm(sym)) { r.net_delta += e.q; r.market_value += e.q * (S1 - S0); }
+    }
+    r.spot = S1; r.dollar_delta = r.net_delta * S1; r.dollar_gamma = r.gamma * S1 * S1 * 0.01;
+    r.unrealized_pl = Number(s.unrealized_pl) + (r.market_value - Number(s.market_value));
+    // 30-day IV moves by the 30-day ATM shock (the √time factor is 1 at 30 days)
+    const iv0 = Number(s.iv30);
+    r.iv30 = ok(s.iv30) ? (shockOn() ? (shock.mode === 'prop' ? iv0 * (1 + shock.amt / 100) : iv0 + shock.amt / 100) : iv0) : s.iv30;
+    if (ok(r.iv30)) r.iv30 = Math.max(r.iv30, 0.03);
+    const em = ok(r.iv30) ? S1 * r.iv30 / Math.sqrt(252) : null;
+    r.expected_move_1d = em; r.expected_move_1d_pct = em != null ? em / S1 : null;
+    if (em != null) { const dP = r.net_delta * em, gP = 0.5 * r.gamma * em * em; r.nextday_up = dP + gP + r.theta; r.nextday_down = -dP + gP + r.theta; }
+    // earnings: move to the post-earnings expiry at its shocked ATM vol; the event jump scales with price
+    if (ok(s.move_to_earnings_expiry) && s.earnings_expiry) {
+      const oe = rows('options').find((o) => o.underlying === sym && o.expiry === s.earnings_expiry);
+      if (oe) { const T1 = Number(oe.t_years), sA = Number(s.move_to_earnings_expiry) / (S0 * Math.sqrt(T1));
+        const sA1 = shockOn() ? (shock.mode === 'norm' || shock.mode === 'parallel' ? Math.max(sA + (shock.amt / 100) * (shock.sqrt ? Math.sqrt(30 / Math.max(Number(oe.dte), 1)) : 1), 0.03) : shockVol(sA, oe.dte)) : sA;
+        r.move_to_earnings_expiry = S1 * sA1 * Math.sqrt(T1); }
+    }
+    if (ok(s.implied_earnings_move)) r.implied_earnings_move = Number(s.implied_earnings_move) * S1 / S0;
+    // requirements: re-pair with shocked marks and spot
+    const optsS = rows('options').map((o) => (shockedOpts[norm(o.occ)] != null ? { ...o, mid: shockedOpts[norm(o.occ)] } : o));
+    const undS = rows('underlyings').map((x) => (x.symbol === sym ? { ...x, spot: S1 } : x));
+    const pr = window.ORD.pairing(rows('positions'), optsS, undS).filter((g) => g.underlying === sym);
+    r.initial_req = pr.reduce((t, g) => t + Number(g.initial_req), 0); r.maint_req = pr.reduce((t, g) => t + Number(g.maint_req), 0);
+    const pon = Math.abs(pxShock) > 1e-9;
+    r.__label = [pon ? `price ${pxShock > 0 ? '+' : '−'}${d3.format('.2~f')(Math.abs(pxShock) * 100)}% (${fmt(S1, 'usd2')})` : '', shockOn() ? `IV ${shock.amt > 0 ? '+' : ''}${shock.amt}${shock.mode === 'prop' ? '%' : ' pts'}` : ''].filter(Boolean).join(', ');
+    r.__shockedKeys = new Set(['net_delta', 'gamma', 'theta', 'vega', 'rho', 'dollar_delta', 'dollar_gamma', 'market_value', 'unrealized_pl', 'nextday', 'iv30', 'expected_move_1d', 'expected_move_1d_pct', 'move_to_earnings_expiry', 'implied_earnings_move', 'initial_req', 'maint_req']);
+    return r;
+  }
   const shockVol = (v, dte) => {
     const f = shock.sqrt ? Math.sqrt(30 / Math.max(Number(dte) || 0, 1)) : 1;
     const nv = shock.mode === 'parallel' ? v + (shock.amt / 100) * f : v * (1 + (shock.amt / 100) * f);
@@ -2106,8 +2185,8 @@ dash.calc('summary', { inputs: ['positions_view', 'pairing', 'options', 'underly
     const what = shock.mode === 'parallel' ? a + ' vol pts' : shock.mode === 'norm' ? `ATM ${a} vol pts, skew preserved${shockInfo.atm0 ? ` (this expiry ATM ${fmt(shockInfo.atm0, 'pct2')} → ${fmt(shockInfo.atm1, 'pct2')})` : ''}` : a + '% of each vol';
     const pxTxt = pon ? `Price ${pxShock > 0 ? '+' : '−'}${d3.format('.2~f')(Math.abs(pxShock) * 100)}%${curSpot ? ` (${fmt(curSpot, 'usd2')} → ${fmt(curSpot * (1 + pxShock), 'usd2')})` : ''}, vols sticky by strike` : '';
     const ivTxt = on ? `IV: ${what}${shock.sqrt ? ', scaled by √(30 / days to expiry)' : ''}` : '';
-    if (view === 'simple') { $('#ord-shk-state').textContent = pon ? `Delta shown at ${curSpot ? fmt(curSpot * (1 + pxShock), 'usd2') : 'the new price'}; bid, ask and IV stay as quoted.` : 'Enter a % move (or a price) to see how each option’s delta would change.'; return; }
-    $('#ord-shk-state').textContent = (on || pon) ? `On: ${[pxTxt, ivTxt].filter(Boolean).join('; ')}. Columns marked * are shocked; bid/ask, position greeks, P&L and scenarios are unchanged.` : 'Off: Theo uses the fitted surface; greeks use market IV.';
+    if (view === 'simple') { $('#ord-shk-state').textContent = pon ? `Delta and the summary lines are shown at ${curSpot ? fmt(curSpot * (1 + pxShock), 'usd2') : 'the new price'} (marked *); bid, ask and IV stay as quoted.` : 'Enter a % move (or a price) to see how each option’s delta would change.'; return; }
+    $('#ord-shk-state').textContent = (on || pon) ? `On: ${[pxTxt, ivTxt].filter(Boolean).join('; ')}. Values marked * are shocked, in the chain and in the summary lines above; bid, ask, market IV and the scenario grid are unchanged.` : 'Off: Theo uses the fitted surface; greeks use market IV.';
   };
   const setAmt = (v) => { shock.amt = Math.round((Number(v) || 0) * 100) / 100; $('#ord-shk-amt').value = shock.amt; syncShock(); render(); };
   $('#ord-shk-mode').addEventListener('change', (e) => { shock.mode = e.target.value; if (shock.mode === 'norm') { shock.sqrt = true; $('#ord-shk-sqrt').checked = true; } syncShock(); render(); });
