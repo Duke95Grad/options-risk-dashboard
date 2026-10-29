@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="en" data-theme="__THEME__">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #ffffff; --ink: #262730; --muted: #6b7180; --line: #e4e6eb; --panel: #f6f7f9;
+    --regt: #2e6fba; --pm: #c2582b; --now: #262730; --sim: #7b4bc4; --exp: #9aa0a8;
+    --up: #1d7f53; --down: #b83a2e; --gainbar: #d3d7de;
+    color-scheme: light;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e1117; --ink: #f2f3f5; --muted: #a0a6b2; --line: #2b2f3a; --panel: #161a22;
+    --regt: #5d9de3; --pm: #e2804f; --now: #f2f3f5; --sim: #ad8ef0; --exp: #7b818c;
+    --up: #46b583; --down: #e36b5e; --gainbar: #4a505c;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 4px 2px; background: var(--bg); color: var(--ink);
+         font: 15px/1.45 "Source Sans 3", "Source Sans Pro", system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .num { font-variant-numeric: tabular-nums; }
+  h3 { font-size: 1rem; font-weight: 600; margin: 0; }
+  .cap { color: var(--muted); font-size: 0.875rem; margin: 2px 0 0; }
+
+  /* controls */
+  .controls { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) auto; gap: 20px 28px;
+              align-items: end; padding: 16px 18px; background: var(--panel); border-radius: 10px; }
+  .ctl-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 2px 10px; margin-bottom: 6px; }
+  .ctl label { font-weight: 600; font-size: 0.9375rem; white-space: nowrap; }
+  .ctl output { font-variant-numeric: tabular-nums; font-size: 0.9375rem; white-space: nowrap; }
+  .ctl output span { color: var(--muted); }
+  input[type=range] { width: 100%; margin: 0; accent-color: var(--sim); height: 22px; cursor: pointer; }
+  input[type=range]:focus-visible { outline: 2px solid var(--sim); outline-offset: 4px; border-radius: 4px; }
+  .scale { display: flex; justify-content: space-between; color: var(--muted); font-size: 0.75rem; margin-top: 2px; }
+  button { font: inherit; font-weight: 600; color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+           border-radius: 8px; padding: 7px 16px; cursor: pointer; }
+  button:hover { border-color: var(--muted); }
+  button:focus-visible { outline: 2px solid var(--sim); outline-offset: 2px; }
+
+  .model { margin: 12px 2px 0; color: var(--muted); font-size: 0.875rem; }
+  .model strong { color: var(--ink); font-weight: 600; }
+
+  /* metrics */
+  .metrics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; margin-top: 22px; }
+  .metric .label { color: var(--muted); font-size: 0.875rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .metric .value { font-size: 1.625rem; font-weight: 600; line-height: 1.2; font-variant-numeric: tabular-nums; }
+  .metric .sub { font-size: 0.875rem; font-variant-numeric: tabular-nums; min-height: 1.3em; color: var(--muted); }
+  .sub.up { color: var(--up); } .sub.down { color: var(--down); }
+  .greeks { padding-top: 16px; margin-top: 18px; border-top: 1px solid var(--line); }
+  .greeks .value { font-size: 1.25rem; }
+
+  /* charts */
+  .charts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; margin-top: 30px; }
+  figure { margin: 0; min-width: 0; }
+  .wide { margin-top: 28px; }
+  .chart { height: 300px; margin-top: 8px; }
+  .chart-msg { color: var(--muted); font-size: 0.875rem; padding: 24px 0; }
+
+  /* tables */
+  section.tbl { margin-top: 30px; }
+  .tbl-wrap { overflow-x: auto; margin-top: 8px; border: 1px solid var(--line); border-radius: 8px; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.875rem; font-variant-numeric: tabular-nums; }
+  th, td { padding: 7px 10px; white-space: nowrap; text-align: right; }
+  th { color: var(--muted); font-weight: 600; background: var(--panel); border-bottom: 1px solid var(--line); }
+  td { border-bottom: 1px solid var(--line); }
+  tr:last-child td { border-bottom: none; }
+  th.l, td.l { text-align: left; }
+  td.up { color: var(--up); } td.down { color: var(--down); }
+
+  @media (max-width: 900px) {
+    .controls { grid-template-columns: 1fr; }
+    .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .charts { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<section class="controls" aria-label="Simulation controls">
+  <div class="ctl">
+    <div class="ctl-head"><label for="ds">Underlying move</label><output id="ds-out" for="ds"></output></div>
+    <input type="range" id="ds">
+    <div class="scale"><span id="ds-min"></span><span id="ds-max"></span></div>
+  </div>
+  <div class="ctl">
+    <div class="ctl-head"><label for="dv">ATM vol change</label><output id="dv-out" for="dv"></output></div>
+    <input type="range" id="dv" min="-10" max="30" step="0.5">
+    <div class="scale"><span>−10 pts</span><span>+30 pts</span></div>
+  </div>
+  <div class="ctl">
+    <div class="ctl-head"><label for="tt">Simulated time</label><output id="tt-out" for="tt"></output></div>
+    <input type="range" id="tt" step="1">
+    <div class="scale"><span id="tt-min"></span><span>4:00 PM</span></div>
+  </div>
+  <button id="reset" type="button">Reset</button>
+</section>
+<p class="model" id="model"></p>
+
+<section class="metrics" id="metrics" aria-live="polite"></section>
+<section class="metrics greeks" id="greeks"></section>
+
+<div class="charts">
+  <figure>
+    <h3>P&amp;L vs. underlying price</h3>
+    <p class="cap">Change in position value from now. The shaded band is the portfolio-margin price range.</p>
+    <div class="chart" id="c-pnl"></div>
+  </figure>
+  <figure>
+    <h3>Portfolio-margin price points</h3>
+    <p class="cap" id="cap-pm"></p>
+    <div class="chart" id="c-pm"></div>
+  </figure>
+</div>
+<figure class="wide">
+  <h3>Requirement through the close</h3>
+  <p class="cap">Reg T and portfolio margin at each 5-minute mark, holding the simulated price and vol.</p>
+  <div class="chart" id="c-path"></div>
+</figure>
+
+<section class="tbl">
+  <h3>Legs at the simulated state</h3>
+  <div class="tbl-wrap"><table id="legs"></table></div>
+</section>
+<section class="tbl">
+  <h3>Reg T by strategy</h3>
+  <div class="tbl-wrap"><table id="regt"></table></div>
+</section>
+
+<script>__ENGINE__</script>
+<script>
+const P = __PAYLOAD__;
+const Z = window.ZDTE;
+const prod = P.product, legs = P.legs, cfg = P.cfg;
+const minsNow = P.minutes_now;
+const css = getComputedStyle(document.documentElement);
+const C = Object.fromEntries(["ink", "muted", "line", "regt", "pm", "now", "sim", "exp", "up", "down", "bg", "gainbar"]
+  .map((k) => [k, css.getPropertyValue("--" + k).trim()]));
+const FONT = '"Source Sans 3", "Source Sans Pro", system-ui, sans-serif';
+
+/* ------------------------------------------------------------ formatting */
+const MINUS = "\u2212";
+const money = (x) => (x < -0.5 ? MINUS : "") + "$" + Math.abs(x).toLocaleString("en-US", { maximumFractionDigits: 0 });
+const signedMoney = (x) => (x > 0.5 ? "+" : "") + money(x);
+const fixed = (x, d) => (x < 0 && Math.abs(x) >= 0.5 * 10 ** -d ? MINUS : "") + Math.abs(x).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+const signed = (x, d) => (x >= 0.5 * 10 ** -d ? "+" : "") + fixed(x, d);
+const pct = (x, d = 1) => signed(x * 100, d) + "%";
+function clockLabel(minsLeft) {
+  const t = 16 * 60 - minsLeft, h = Math.floor(t / 60), m = Math.round(t % 60);
+  const hh = ((h + 11) % 12) + 1;
+  return `${hh}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
+}
+function clockIso(minsLeft) {
+  const t = 16 * 60 - minsLeft, h = Math.floor(t / 60), m = Math.round(t % 60);
+  return `2000-01-01 ${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+const dur = (m) => `${Math.floor(m / 60)}h ${String(Math.round(m % 60)).padStart(2, "0")}m`;
+const tone = (x, inverse) => (Math.abs(x) < 0.5 ? "" : (x > 0) !== !!inverse ? "up" : "down");
+
+/* ------------------------------------------------------------ controls */
+const rng = prod.kind === "equity" ? 15 : 10;
+const el = (id) => document.getElementById(id);
+const ds = el("ds"), dv = el("dv"), tt = el("tt");
+ds.min = -rng; ds.max = rng; ds.step = 0.05;
+el("ds-min").textContent = `${MINUS}${rng}%`; el("ds-max").textContent = `+${rng}%`;
+tt.min = 0; tt.max = Math.round(minsNow);
+el("tt-min").textContent = clockLabel(minsNow);
+
+const KEY = `zdte-sim-${prod.symbol}`;
+function loadState() {
+  try {
+    const s = JSON.parse(localStorage.getItem(KEY) || "null");
+    if (!s) return;
+    ds.value = s.ds; dv.value = s.dv;
+    tt.value = Math.min(Math.max(minsNow - s.minsLeft, 0), minsNow);
+  } catch (e) { /* storage unavailable: start fresh */ }
+}
+function saveState(state) {
+  try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* ignore */ }
+}
+ds.value = 0; dv.value = 0; tt.value = 0;
+loadState();
+
+/* ------------------------------------------------------------ static "now" state */
+const now = Z.snapshot(prod, legs, prod.spot, prod.iv, minsNow, cfg);
+
+/* ------------------------------------------------------------ rendering */
+function metric(label, value, sub, cls) {
+  return `<div class="metric"><div class="label">${label}</div><div class="value">${value}</div>` +
+         `<div class="sub ${cls || ""}">${sub || ""}</div></div>`;
+}
+function table(cols, rows) {
+  const head = "<tr>" + cols.map((c) => `<th class="${c.l ? "l" : ""}" scope="col">${c.h}</th>`).join("") + "</tr>";
+  const body = rows.map((r) => "<tr>" + cols.map((c) => {
+    const v = c.f(r), cl = [c.l ? "l" : "", c.tone ? tone(c.raw(r), c.inverse) : ""].join(" ");
+    return `<td class="${cl}">${v}</td>`;
+  }).join("") + "</tr>").join("");
+  return `<thead>${head}</thead><tbody>${body}</tbody>`;
+}
+
+let plotlyReady = false;
+function layout(extra) {
+  const base = {
+    margin: { l: 58, r: 12, t: 30, b: 40 },
+    paper_bgcolor: "rgba(0,0,0,0)", plot_bgcolor: "rgba(0,0,0,0)",
+    font: { family: FONT, size: 12, color: C.muted },
+    xaxis: { gridcolor: C.line, linecolor: C.line, zeroline: false, tickfont: { color: C.muted } },
+    yaxis: { gridcolor: C.line, zerolinecolor: C.muted, zerolinewidth: 1, tickformat: "$~s",
+             tickfont: { color: C.muted } },
+    legend: { orientation: "h", x: 0, xanchor: "left", y: 1.02, yanchor: "bottom",
+              font: { size: 12, color: C.ink }, bgcolor: "rgba(0,0,0,0)" },
+    hoverlabel: { font: { family: FONT, size: 13 }, bgcolor: C.bg, bordercolor: C.line },
+    showlegend: true,
+  };
+  return Object.assign(base, extra || {}, {
+    xaxis: Object.assign(base.xaxis, (extra || {}).xaxis || {}),
+    yaxis: Object.assign(base.yaxis, (extra || {}).yaxis || {}),
+  });
+}
+const PCFG = { displayModeBar: false, responsive: true };
+
+function draw(state, sim) {
+  if (!plotlyReady) return;
+  const { S, iv, minsSim } = state;
+
+  // P&L vs price
+  const lo = Math.min(prod.spot * (1 - 1.5 * prod.pm_down), S * 0.99);
+  const hi = Math.max(prod.spot * (1 + 1.5 * prod.pm_up), S * 1.01);
+  const xs = Array.from({ length: 241 }, (_, i) => lo + (hi - lo) * i / 240);
+  const ref = now.totals.value;
+  const curve = (vol, mins) => xs.map((x) => Z.positionValue(prod, legs, x, vol, mins, cfg) - ref);
+  const hov = `${prod.symbol} %{x:,.2f}<br>%{y:$,.0f}<extra>%{fullData.name}</extra>`;
+  const traces = [
+    { x: xs, y: curve(prod.iv, minsNow), name: `Now, ${clockLabel(minsNow)}`, mode: "lines",
+      line: { color: C.now, width: 2 }, hovertemplate: hov },
+  ];
+  const moved = minsSim !== minsNow || iv !== prod.iv;
+  if (moved) traces.push({ x: xs, y: curve(iv, minsSim), name: `Simulated, ${clockLabel(minsSim)}`,
+                            mode: "lines", line: { color: C.sim, width: 2.5 }, hovertemplate: hov });
+  traces.push({ x: xs, y: curve(prod.iv, 0), name: "At expiry", mode: "lines",
+                line: { color: C.exp, width: 1.5, dash: "dot" }, hovertemplate: hov });
+  const shapes = [
+    { type: "rect", xref: "x", yref: "paper", x0: prod.spot * (1 - prod.pm_down), x1: prod.spot * (1 + prod.pm_up),
+      y0: 0, y1: 1, fillcolor: C.pm, opacity: 0.07, line: { width: 0 }, layer: "below" },
+    { type: "line", xref: "x", yref: "paper", x0: prod.spot, x1: prod.spot, y0: 0, y1: 1,
+      line: { color: C.muted, width: 1, dash: "dash" } },
+  ];
+  if (Math.abs(S - prod.spot) > 1e-9) shapes.push({ type: "line", xref: "x", yref: "paper", x0: S, x1: S,
+      y0: 0, y1: 1, line: { color: C.sim, width: 1.5 } });
+  Plotly.react("c-pnl", traces, layout({ shapes, hovermode: "closest",
+    xaxis: { title: { text: prod.symbol, font: { size: 12, color: C.muted } }, tickformat: ",.0f" } }), PCFG);
+
+  // PM points
+  const pm = sim.pm, ptsPct = pm.points.map((p) => p * 100);
+  const colors = pm.pnl.map((v, i) => (i === pm.worst_idx ? C.pm : v < 0 ? C.exp : C.gainbar));
+  const pmShapes = pm.minimum > pm.scenario_loss ? [{ type: "line", xref: "paper", x0: 0, x1: 1,
+      y0: -pm.minimum, y1: -pm.minimum, line: { color: C.muted, dash: "dot", width: 1 } }] : [];
+  Plotly.react("c-pm", [{ type: "bar", x: ptsPct, y: pm.pnl, marker: { color: colors },
+      hovertemplate: "Move %{x:+.1f}%<br>P&L %{y:$,.0f}<extra></extra>" }],
+    layout({ showlegend: false, margin: { l: 58, r: 12, t: 12, b: 40 }, shapes: pmShapes, bargap: 0.25,
+      xaxis: { tickmode: "array", tickvals: ptsPct, ticktext: ptsPct.map((p) => (p > 0 ? "+" : p < 0 ? MINUS : "") + Math.abs(p).toFixed(1) + "%"),
+               tickfont: { size: 11, color: C.muted } } }), PCFG);
+
+  // requirement path
+  const path = Z.requirementPath(prod, legs, S, iv, minsNow, cfg, 5);
+  const px = path.map((r) => clockIso(r.minutes_left));
+  const pShapes = minsSim !== minsNow ? [{ type: "line", xref: "x", yref: "paper", x0: clockIso(minsSim),
+      x1: clockIso(minsSim), y0: 0, y1: 1, line: { color: C.sim, width: 1.5 } }] : [];
+  Plotly.react("c-path", [
+    { x: px, y: path.map((r) => r.regt), name: "Reg T", mode: "lines", line: { color: C.regt, width: 2 } },
+    { x: px, y: path.map((r) => r.pm), name: "Portfolio margin", mode: "lines", line: { color: C.pm, width: 2 } },
+  ], layout({ shapes: pShapes, hovermode: "x unified",
+    xaxis: { type: "date", tickformat: "%-I:%M %p", hoverformat: "%-I:%M %p" },
+    yaxis: { hoverformat: "$,.0f", rangemode: "tozero" } }), PCFG);
+}
+
+function render() {
+  const dsv = parseFloat(ds.value), dvv = parseFloat(dv.value), elapsed = parseFloat(tt.value);
+  const S = prod.spot * (1 + dsv / 100), iv = Math.max(prod.iv + dvv / 100, 0.02);
+  const minsSim = Math.max(minsNow - elapsed, 0);
+  const sim = Z.snapshot(prod, legs, S, iv, minsSim, cfg);
+  saveState({ ds: dsv, dv: dvv, minsLeft: minsSim });
+
+  el("ds-out").innerHTML = `${pct(dsv / 100, 2)} <span>→ ${fixed(S, 2)}</span>`;
+  el("dv-out").innerHTML = `${signed(dvv, 1)} pts <span>→ ${fixed(iv * 100, 1)}%</span>`;
+  el("tt-out").innerHTML = `${clockLabel(minsSim)} <span>${minsSim > 0 ? dur(minsSim) + " left" : "at the close"}</span>`;
+
+  const T = Z.yearFraction(minsSim, cfg);
+  el("model").innerHTML = `Model: <strong>Black-Scholes-Merton</strong>, continuous dividend yield, skew by moneyness` +
+    `${prod.american ? ", American style floored at intrinsic value" : ""}. ` +
+    `T = ${T.toExponential(3)} years (${Math.round(minsSim)} min, ${cfg.convention === "calendar" ? "calendar" : "trading"} time).`;
+
+  const dReg = sim.regt - now.regt, dPm = sim.pm.requirement - now.pm.requirement;
+  const pnl = sim.totals.value - now.totals.value;
+  el("metrics").innerHTML = [
+    metric("Spot", fixed(S, 2), Math.abs(dsv) > 1e-9 ? signed(S - prod.spot, 2) : "Unchanged", tone(S - prod.spot)),
+    metric("ATM IV", fixed(iv * 100, 1) + "%", Math.abs(dvv) > 1e-9 ? signed(dvv, 1) + " pts" : "Unchanged", tone(dvv)),
+    metric("Reg T", money(sim.regt), Math.abs(dReg) > 0.5 ? signedMoney(dReg) + " vs now" : "No change", tone(dReg, true)),
+    metric("Portfolio margin", money(sim.pm.requirement), Math.abs(dPm) > 0.5 ? signedMoney(dPm) + " vs now" : "No change", tone(dPm, true)),
+    metric("P&L vs now", money(pnl), `${signedMoney(sim.totals.pnl_vs_fill)} vs fills`, tone(pnl)),
+  ].join("");
+
+  const t = sim.totals;
+  el("greeks").innerHTML = [
+    metric("Net delta (shares)", signed(t.delta_shares, 0)),
+    metric("Delta dollars", money(t.dollar_delta)),
+    metric("Gamma per 1% move", signed(t.gamma_shares_1pct, 0) + " sh"),
+    metric(minsSim >= 60 ? "Theta, next hour" : "Theta, to the close", money(t.theta_next_hr)),
+    metric("Vega per vol point", money(t.vega_per_pt)),
+  ].join("");
+
+  el("cap-pm").textContent = `Revalued at the simulated time across ${MINUS}${(prod.pm_down * 100).toFixed(0)}% to ` +
+    `+${(prod.pm_up * 100).toFixed(0)}%. Worst loss ${money(sim.pm.scenario_loss)}` +
+    (sim.pm.minimum > sim.pm.scenario_loss ? `; the ${money(sim.pm.minimum)} per-contract minimum applies (dotted line).` : ".");
+
+  const rows = sim.legs.map((r, i) => ({ ...r, theo_now: now.legs[i].theo, pnl_now: r.value - now.legs[i].value }));
+  el("legs").innerHTML = table([
+    { h: "Strategy", l: 1, f: (r) => r.strategy },
+    { h: "Option", l: 1, f: (r) => r.option },
+    { h: "Qty", f: (r) => signed(r.qty, 0) },
+    { h: "Avg", f: (r) => fixed(r.avg_price, 2) },
+    { h: "Theo now", f: (r) => fixed(r.theo_now, 2) },
+    { h: "Theo sim", f: (r) => fixed(r.theo, 2) },
+    { h: "IV", f: (r) => fixed(r.iv * 100, 1) + "%" },
+    { h: "Delta", f: (r) => signed(r.delta, 3) },
+    { h: "Delta shares", f: (r) => signed(r.delta_shares, 0) },
+    { h: "Gamma per 1%", f: (r) => signed(r.gamma_shares_1pct, 0) },
+    { h: "Theta next hr", f: (r) => money(r.theta_next_hr) },
+    { h: "Vega per pt", f: (r) => money(r.vega_per_pt) },
+    { h: "P&L vs now", f: (r) => money(r.pnl_now), tone: 1, raw: (r) => r.pnl_now },
+    { h: "P&L vs fill", f: (r) => money(r.pnl_vs_fill), tone: 1, raw: (r) => r.pnl_vs_fill },
+  ], rows);
+
+  const reg = sim.regt_rows.map((r, i) => ({ ...r, now: now.regt_rows[i].requirement }));
+  el("regt").innerHTML = table([
+    { h: "Strategy", l: 1, f: (r) => r.strategy },
+    { h: "How it's margined", l: 1, f: (r) => r.method },
+    { h: "Now", f: (r) => money(r.now) },
+    { h: "Simulated", f: (r) => money(r.requirement) },
+    { h: "Change", f: (r) => (Math.abs(r.requirement - r.now) > 0.5 ? signedMoney(r.requirement - r.now) : "—"),
+      tone: 1, inverse: 1, raw: (r) => r.requirement - r.now },
+  ], reg);
+
+  draw({ S, iv, minsSim }, sim);
+}
+
+let queued = false;
+function schedule() {
+  if (queued) return;
+  queued = true;
+  requestAnimationFrame(() => { queued = false; render(); });
+}
+[ds, dv, tt].forEach((x) => x.addEventListener("input", schedule));
+el("reset").addEventListener("click", () => { ds.value = 0; dv.value = 0; tt.value = 0; render(); });
+
+/* ------------------------------------------------------------ load Plotly, then draw */
+(function loadPlotly() {
+  const urls = ["https://cdn.plot.ly/plotly-2.35.2.min.js",
+                "https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.35.2/plotly.min.js"];
+  let i = 0;
+  (function next() {
+    if (i >= urls.length) {
+      ["c-pnl", "c-pm", "c-path"].forEach((id) => {
+        el(id).innerHTML = '<p class="chart-msg">Charts couldn’t load because the charting library was blocked. ' +
+                           'The numbers above are still live. Reload the page to try again.</p>';
+      });
+      return;
+    }
+    const s = document.createElement("script");
+    s.src = urls[i++];
+    s.onload = () => { plotlyReady = true; render(); };
+    s.onerror = next;
+    document.head.appendChild(s);
+  })();
+})();
+
+render();
+</script>
+</body>
+</html>
